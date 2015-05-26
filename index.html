@@ -1,0 +1,110 @@
+<html lang="zh-tw">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <script src="jquery.min.js"></script>
+  <script src="bootstrap.min.js"></script>
+  <script src="histdata.js"></script>
+  <script src="plot.js"></script>
+  <script src="trader.js"></script>
+  <link rel="stylesheet" href="bootstrap.min.css" />
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div id="header">
+  <button id="btn_next" onclick="StartNewPlot()" class="btn btn-primary">Next Plot</button>
+  <button id="btn_buy" class="btn btn-success" onclick="Buy(1)">Buy</button>
+  <button id="btn_short" class="btn btn-success" onclick="Buy(-1)">Short</button>
+  <button id="btn_hold" class="btn btn-default" onclick="MoveToNextDay()">Hold</button>
+  <button id="btn_sell" class="btn btn-danger" onclick="Sell()">Sell</button>
+  <button id="btn_nextday" class="btn btn-default" onclick="MoveToNextDay()">NextDay</button><br>
+  <div id="CashInfo"></div><div id="stockinfo"></div>
+  </div>
+  <canvas id="canvas" width="800" height="500"></canvas>
+</body>
+</html>
+<script>
+  $(document).ready(function(){
+    $("#btn_buy").hide();
+    $("#btn_short").hide();
+    $("#btn_nextday").hide();
+    $("#btn_hold").hide();
+    $("#btn_sell").hide();
+
+    trader = new Trader();
+    ShowCashInfo();
+    var canvas = $('#canvas')[0];
+    canvas.width = $('html').width() - 5;
+    canvas.height = $('html').height() - $('#header').height() - 50;
+  });
+  var trader;
+  var histdata;
+  var plot;
+  var currentIdx = 0;
+  var viewCount = 40;
+  function StartNewPlot(){
+    $("#btn_next").attr('disabled', true);
+    var canvas = $('#canvas')[0];
+    plot = new Plot(canvas, 5, 30, canvas.width-m_nYAxisTextWidth, canvas.height-30);
+    //TODO: Start & End Date set by user
+    var stockid = StockList[Math.floor(Math.random()*StockList.length)];
+    console.log(stockid);
+    histdata = new HistData(stockid,'2015-01-01','2015-05-30', function(retStatus){
+      if(retStatus == true){
+        try{
+          currentIdx = Math.floor(histdata.getLength()/4+Math.random()*histdata.getLength()/2);
+          MoveToNextDay();
+          $("#btn_buy").show();
+          $("#btn_short").show();
+          $("#btn_nextday").show();
+          $("#btn_next").attr('disabled', false);
+        }
+        catch(err){
+          console.log(histdata.getSymboInfo(currentIdx));
+        }
+      }
+      else{
+        console.log("No Data");
+        StartNewPlot();
+      }
+    });
+  }
+  function Buy(direction){
+    trader.Buy(currentIdx, direction, histdata.getSymboInfo(currentIdx));
+
+    MoveToNextDay();
+
+    $("#btn_buy").hide();
+    $("#btn_short").hide();
+    $("#btn_nextday").hide();
+    $("#btn_hold").show();
+    $("#btn_sell").show();
+  }
+  function MoveToNextDay(){
+    --currentIdx;
+    plot.drawCandlePlot(histdata.getData(currentIdx, viewCount));
+    if(trader.getHoldIndex()!=-1){
+      plot.drawSelectLine(trader.getHoldIndex()-currentIdx);
+    }
+    $("#stockinfo").html("開:"+histdata.getSymboInfo(currentIdx).Open+
+                         " 高:"+histdata.getSymboInfo(currentIdx).High+
+                         " 低:"+histdata.getSymboInfo(currentIdx).Low+
+                         " 收:"+histdata.getSymboInfo(currentIdx).Close+
+                         " 量:"+histdata.getSymboInfo(currentIdx).Volume);
+  }
+  function Sell(){
+    trader.Sell(histdata.getSymboInfo(currentIdx));
+
+    ShowCashInfo();
+
+    MoveToNextDay();
+
+    $("#btn_buy").show();
+    $("#btn_short").show();
+    $("#btn_nextday").show();
+    $("#btn_hold").hide();
+    $("#btn_sell").hide();
+  }
+  function ShowCashInfo(){
+    $("#CashInfo").html("資產: "+trader.getAsset()+"("+(trader.getAsset()-10000000)/100000+"%)");
+  }
+</script>
